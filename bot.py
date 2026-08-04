@@ -1,9 +1,9 @@
 import os
 import asyncio
+import requests
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
-import yt_dlp
 
 # --- Render Keeping Alive Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -43,32 +43,35 @@ async def download_video(event):
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
-    # Cookies आधारित 100% Working yt-dlp Settings
-    ydl_opts = {
-        'format': 'best[filesize<2000M]/best',
-        'outtmpl': output_file,
-        'quiet': True,
-        'nocheckcertificate': True
-    }
-
-    # अगर GitHub पर cookies.txt मौजूद है, तो उसे यूज़ करेगा
-    if os.path.exists("cookies.txt"):
-        ydl_opts['cookiefile'] = 'cookies.txt'
-
     try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([url]))
+        # YouTube Fast API Download Endpoint
+        download_api = f"https://api.v2.savefrom.net/api/convert?url={url}"
+        
+        # 3rd Party API request to bypass YouTube IP Block
+        api_res = requests.get(f"https://co.wuk.sh/api/json", json={"url": url}, headers={"Accept": "application/json", "Content-Type": "application/json"}, timeout=15)
+        
+        video_download_url = None
+        if api_res.status_code == 200 and "url" in api_res.json():
+            video_download_url = api_res.json()["url"]
 
-        if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-            await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
-            await bot.send_file(
-                event.chat_id,
-                file=output_file,
-                caption="यह रहा आपका वीडियो! 🎬"
-            )
-            await status_msg.delete()
-        else:
-            await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो सका।")
+        if video_download_url:
+            r = requests.get(video_download_url, stream=True, timeout=120)
+            with open(output_file, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=1024*1024):
+                    if chunk:
+                        f.write(chunk)
+
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
+                await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
+                await bot.send_file(
+                    event.chat_id,
+                    file=output_file,
+                    caption="यह रहा आपका वीडियो! 🎬"
+                )
+                await status_msg.delete()
+                return
+
+        await status_msg.edit("❌ सर्वर ब्लॉक के कारण यह वीडियो डाउनलोड नहीं हो सका।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
