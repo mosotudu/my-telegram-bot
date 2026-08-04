@@ -5,7 +5,7 @@ from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 
-# --- Render 24/7 Server Active Keeper ---
+# --- Dummy Web Server (Render Keeping Alive) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,14 +23,14 @@ Thread(target=run_dummy_server, daemon=True).start()
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 
-# ⚠️ यहाँ अपना टेलीग्राम बोट टोकन डालें
-BOT_TOKEN = "8833066297:AAGcPCEdxfjwGVpfpC09kemN3pltTtFcfxM"
+# Render Environment Variable से सुरक्षित रूप से टोकन प्राप्त करना
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे यूट्यूब (Shorts/Videos) का लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे यूट्यूब/वीडियो लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -46,10 +46,7 @@ async def download_video(event):
     output_file = f"video_{event.message.id}.mp4"
 
     try:
-        # YouTube Bot-Block Bypass via Direct Service API
         api_url = f"https://api.cohttps.workers.dev/?url={url}"
-        
-        # API से वीडियो डेटा डाउनलोड करना
         response = requests.get(api_url, stream=True, timeout=60)
         
         if response.status_code == 200:
@@ -68,7 +65,7 @@ async def download_video(event):
                 await status_msg.delete()
                 return
 
-        await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो पाया। YouTube ने सर्वर IP ब्लॉक किया है।")
+        await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो पाया।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
