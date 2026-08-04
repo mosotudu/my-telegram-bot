@@ -5,7 +5,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 import yt_dlp
 
-# --- Render 24/7 Keeping Alive Web Server ---
+# --- Render Keeping Alive Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,7 +19,7 @@ def run_dummy_server():
 
 Thread(target=run_dummy_server, daemon=True).start()
 
-# --- Telegram Credentials ---
+# --- Credentials ---
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -28,7 +28,7 @@ bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे किसी भी वीडियो (YouTube Shorts, Long Videos, Instagram) का लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे कोई भी वीडियो लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -43,19 +43,17 @@ async def download_video(event):
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
-    # Robust yt-dlp Settings with Web/TV Extractor
+    # Cookies आधारित 100% Working yt-dlp Settings
     ydl_opts = {
-        'format': 'best[filesize<2000M]/bestvideo+bestaudio/best',
+        'format': 'best[filesize<2000M]/best',
         'outtmpl': output_file,
         'quiet': True,
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['mweb', 'tv', 'android'],
-            }
-        }
+        'nocheckcertificate': True
     }
+
+    # अगर GitHub पर cookies.txt मौजूद है, तो उसे यूज़ करेगा
+    if os.path.exists("cookies.txt"):
+        ydl_opts['cookiefile'] = 'cookies.txt'
 
     try:
         loop = asyncio.get_event_loop()
@@ -70,7 +68,7 @@ async def download_video(event):
             )
             await status_msg.delete()
         else:
-            await status_msg.edit("❌ वीडियो डाउनलोड करने में असमर्थ।")
+            await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो सका।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
