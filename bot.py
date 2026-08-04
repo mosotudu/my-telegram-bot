@@ -1,11 +1,12 @@
 import os
 import asyncio
+import requests
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 import yt_dlp
 
-# --- Dummy Web Server (Render 24/7 Keeping Alive) ---
+# --- Render Keeping Alive Web Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -30,7 +31,7 @@ bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी आसानी से डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे इंस्टाग्राम, यूट्यूब या कोई भी वीडियो लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -45,44 +46,53 @@ async def download_video(event):
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
-    # Invidious Instance Bypass Configuration
-    ydl_opts = {
-        'format': 'best[filesize<2000M]/best',
-        'outtmpl': output_file,
-        'quiet': True,
-        'nocheckcertificate': True,
-        'geo_bypass': True,
-        'extractor_args': {
-            'youtube': {
-                'invidious_instance': ['inv.tux.stream', 'invidious.nerdvpn.de'],
-                'player_client': ['android', 'ios'],
-            }
-        }
-    }
-
+    # 1️⃣ सबसे पहले Cobalt API से यूट्यूब डाउनलोड करने की कोशिश (No IP Block Error)
     try:
-        loop = asyncio.get_event_loop()
-        await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([url]))
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        data = {"url": url, "videoQuality": "max"}
+        
+        response = requests.post("https://api.cobalt.tools/api/json", json=data, headers=headers, timeout=15)
+        res_data = response.json()
 
-        if not os.path.exists(output_file):
-            await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो सका।")
-            return
+        if response.status_code == 200 and "url" in res_data:
+            direct_link = res_data["url"]
+            video_bytes = requests.get(direct_link, stream=True)
+            with open(output_file, 'wb') as f:
+                for chunk in video_bytes.iter_content(chunk_size=1024*1024):
+                    if chunk:
+                        f.write(chunk)
+    except Exception as e:
+        print("Cobalt Fallback Error:", e)
 
-        await status_msg.edit("📤 बड़ी फाइल Telegram पर अपलोड हो रही है...")
+    # 2️⃣ अगर Cobalt काम न करे, तो yt-dlp यूज़ होगा (Instagram/X/Other sites के लिए)
+    if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
+        ydl_opts = {
+            'format': 'best[filesize<2000M]/best',
+            'outtmpl': output_file,
+            'quiet': True,
+            'nocheckcertificate': True
+        }
+        try:
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([url]))
+        except Exception as e:
+            pass
 
+    # 3️⃣ अपलोडिंग
+    if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+        await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
         await bot.send_file(
             event.chat_id,
             file=output_file,
             caption="यह रहा आपका वीडियो! 🎬"
         )
         await status_msg.delete()
+        os.remove(output_file)
+    else:
+        await status_msg.edit("❌ वीडियो डाउनलोड करने में असमर्थ। कृपया दूसरा लिंक ट्राई करें।")
 
-    except Exception as e:
-        await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
-
-    finally:
-        if os.path.exists(output_file):
-            os.remove(output_file)
-
-print("Telethon 2GB बोट चालू हो रहा है...")
+print("Telethon 2GB Cobalt-Supported बोट चालू हो रहा है...")
 bot.run_until_disconnected()
