@@ -1,9 +1,9 @@
 import os
 import asyncio
-import requests
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
+import yt_dlp
 
 # --- Render Keeping Alive Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
@@ -28,7 +28,7 @@ bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे कोई भी वीडियो लिंक भेजें, मैं डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे Facebook, Instagram या Twitter/X का लिंक भेजें, मैं वीडियो डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -40,35 +40,35 @@ async def download_video(event):
         await event.respond("कृपया एक सही वीडियो लिंक भेजें।")
         return
 
+    # YouTube लिंक के लिए साफ़ मना कर देगा ताकि टाइम वेस्ट न हो
+    if "youtube.com" in url or "youtu.be" in url:
+        await event.respond("❌ YouTube के सर्वर ब्लॉकिंग के कारण YouTube वीडियो समर्थित नहीं हैं। कृपया Facebook, Instagram या Twitter लिंक आज़माएं।")
+        return
+
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
+    ydl_opts = {
+        'format': 'best[filesize<2000M]/best',
+        'outtmpl': output_file,
+        'quiet': True,
+        'nocheckcertificate': True
+    }
+
     try:
-        # Working Public API Endpoint for Youtube Bypass
-        api_url = f"https://api.v2.savefrom.net/api/convert"
-        payload = {"url": url}
-        headers = {"User-Agent": "Mozilla/5.0"}
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, lambda: yt_dlp.YoutubeDL(ydl_opts).download([url]))
 
-        # Attempting direct stream bypass using fallback CDN
-        cdn_url = f"https://de1.bot-yt.workers.dev/?url={url}"
-        
-        res = requests.get(cdn_url, timeout=30)
-        
-        if res.status_code == 200:
-            with open(output_file, 'wb') as f:
-                f.write(res.content)
-
-            if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
-                await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
-                await bot.send_file(
-                    event.chat_id,
-                    file=output_file,
-                    caption="यह रहा आपका वीडियो! 🎬"
-                )
-                await status_msg.delete()
-                return
-
-        await status_msg.edit("❌ सर्वर IP ब्लॉक होने के कारण वीडियो डाउनलोड नहीं हो सका।")
+        if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+            await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
+            await bot.send_file(
+                event.chat_id,
+                file=output_file,
+                caption="यह रहा आपका वीडियो! 🎬"
+            )
+            await status_msg.delete()
+        else:
+            await status_msg.edit("❌ यह वीडियो डाउनलोड नहीं हो सका।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
