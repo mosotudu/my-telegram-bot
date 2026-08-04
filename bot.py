@@ -44,22 +44,19 @@ async def download_video(event):
     output_file = f"video_{event.message.id}.mp4"
 
     try:
-        # YouTube Fast API Download Endpoint
-        download_api = f"https://api.v2.savefrom.net/api/convert?url={url}"
-        
-        # 3rd Party API request to bypass YouTube IP Block
-        api_res = requests.get(f"https://co.wuk.sh/api/json", json={"url": url}, headers={"Accept": "application/json", "Content-Type": "application/json"}, timeout=15)
-        
-        video_download_url = None
-        if api_res.status_code == 200 and "url" in api_res.json():
-            video_download_url = api_res.json()["url"]
+        # Working Public API Endpoint for Youtube Bypass
+        api_url = f"https://api.v2.savefrom.net/api/convert"
+        payload = {"url": url}
+        headers = {"User-Agent": "Mozilla/5.0"}
 
-        if video_download_url:
-            r = requests.get(video_download_url, stream=True, timeout=120)
+        # Attempting direct stream bypass using fallback CDN
+        cdn_url = f"https://de1.bot-yt.workers.dev/?url={url}"
+        
+        res = requests.get(cdn_url, timeout=30)
+        
+        if res.status_code == 200:
             with open(output_file, 'wb') as f:
-                for chunk in r.iter_content(chunk_size=1024*1024):
-                    if chunk:
-                        f.write(chunk)
+                f.write(res.content)
 
             if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
                 await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
@@ -71,7 +68,7 @@ async def download_video(event):
                 await status_msg.delete()
                 return
 
-        await status_msg.edit("❌ सर्वर ब्लॉक के कारण यह वीडियो डाउनलोड नहीं हो सका।")
+        await status_msg.edit("❌ सर्वर IP ब्लॉक होने के कारण वीडियो डाउनलोड नहीं हो सका।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
