@@ -5,7 +5,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 import yt_dlp
 
-# --- Dummy Web Server ---
+# --- Dummy Web Server (Render 24/7 Keeping Alive) ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,14 +23,14 @@ Thread(target=run_dummy_server, daemon=True).start()
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 
-# ⚠️ अपना Bot Token यहाँ रखें
+# ⚠️ यहाँ अपना बोट टोकन भरें
 BOT_TOKEN = "8833066297:AAGcPCEdxfjwGVpfpC09kemN3pltTtFcfxM"
 
 bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं वीडियो डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी आसानी से डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -45,15 +45,17 @@ async def download_video(event):
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
-    # YouTube Bot Detection Bypass Settings
+    # Invidious Instance Bypass Configuration
     ydl_opts = {
         'format': 'best[filesize<2000M]/best',
         'outtmpl': output_file,
         'quiet': True,
         'nocheckcertificate': True,
+        'geo_bypass': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['ios', 'mweb', 'tv'],
+                'invidious_instance': ['inv.tux.stream', 'invidious.nerdvpn.de'],
+                'player_client': ['android', 'ios'],
             }
         }
     }
