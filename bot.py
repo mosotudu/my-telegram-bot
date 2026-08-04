@@ -1,11 +1,12 @@
 import os
 import asyncio
+import requests
 from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 import yt_dlp
 
-# --- Render Keeping Alive Web Server ---
+# --- Render Keeping Alive Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,7 +20,19 @@ def run_dummy_server():
 
 Thread(target=run_dummy_server, daemon=True).start()
 
-# --- Telegram Credentials ---
+# --- Self Ping Loop to Prevent Render Sleep ---
+async def keep_alive():
+    await asyncio.sleep(10)
+    render_url = os.environ.get("RENDER_EXTERNAL_URL")
+    while True:
+        if render_url:
+            try:
+                requests.get(render_url, timeout=10)
+            except Exception:
+                pass
+        await asyncio.sleep(600)  # Ping every 10 mins
+
+# --- Credentials ---
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -40,7 +53,6 @@ async def download_video(event):
         await event.respond("कृपया एक सही वीडियो लिंक भेजें।")
         return
 
-    # YouTube के लिंक्स को फ़िल्टर करना
     if "youtube.com" in url or "youtu.be" in url:
         await event.respond("⚠️ YouTube के सर्वर ब्लॉकिंग के कारण YouTube सपोर्टेड नहीं है। कृपया Instagram, Facebook, X (Twitter) आदि का लिंक भेजें।")
         return
@@ -48,7 +60,6 @@ async def download_video(event):
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
-    # All-other platforms yt-dlp config
     ydl_opts = {
         'format': 'best[filesize<2000M]/best',
         'outtmpl': output_file,
@@ -79,4 +90,9 @@ async def download_video(event):
             os.remove(output_file)
 
 print("Telegram Multi-Platform Downloader Bot Active...")
+
+# Background task for keepalive
+loop = asyncio.get_event_loop()
+loop.create_task(keep_alive())
+
 bot.run_until_disconnected()
