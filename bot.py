@@ -1,12 +1,30 @@
 import os
 import asyncio
+from threading import Thread
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pyrogram import Client, filters
 import yt_dlp
 
+# --- Render को एक्टिव रखने के लिए Dummy Web Server ---
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.end_headers()
+        self.wfile.write(b"Bot is alive!")
+
+def run_dummy_server():
+    port = int(os.environ.get("PORT", 8080))
+    server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+    server.serve_forever()
+
+# बैकग्राउंड में सर्वर स्टार्ट करना
+Thread(target=run_dummy_server, daemon=True).start()
+
+# --- Telegram Bot Config ---
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 
-# ⚠️ यहाँ अपना Bot Token ज़रूर डालें
+# ⚠️ यहाँ अपना Bot Token भरें
 BOT_TOKEN = "8833066297:AAGcPCEdxfjwGVpfpC09kemN3pltTtFcfxM"
 
 app = Client(
@@ -18,7 +36,7 @@ app = Client(
 
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    await message.reply_text("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी डाउनलोड करके भेज दूंगा!")
+    await message.reply_text("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी आसानी से डाउनलोड करके भेज दूंगा!")
 
 @app.on_message(filters.text & ~filters.command(["start"]))
 async def download_video(client, message):
@@ -61,5 +79,5 @@ async def download_video(client, message):
             os.remove(output_file)
 
 if __name__ == "__main__":
-    print("2GB सपोर्ट बोट चालू हो गया है...")
+    print("2GB सपोर्ट बोट पोर्ट के साथ चालू हो गया है...")
     app.run()
