@@ -5,7 +5,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 import yt_dlp
 
-# --- Render Keeping Alive Server ---
+# --- Render Keeping Alive Web Server ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -19,7 +19,7 @@ def run_dummy_server():
 
 Thread(target=run_dummy_server, daemon=True).start()
 
-# --- Credentials ---
+# --- Telegram Credentials ---
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
@@ -28,7 +28,7 @@ bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
 @bot.on(events.NewMessage(pattern='/start'))
 async def start(event):
-    await event.respond("नमस्ते! 👋\nमुझे Facebook, Instagram या Twitter/X का लिंक भेजें, मैं वीडियो डाउनलोड करके भेज दूंगा!")
+    await event.respond("नमस्ते! 👋\nमुझे Instagram, Facebook, X (Twitter), Reddit आदि का लिंक भेजें, मैं वीडियो डाउनलोड करके भेज दूंगा!")
 
 @bot.on(events.NewMessage)
 async def download_video(event):
@@ -40,14 +40,15 @@ async def download_video(event):
         await event.respond("कृपया एक सही वीडियो लिंक भेजें।")
         return
 
-    # YouTube लिंक के लिए साफ़ मना कर देगा ताकि टाइम वेस्ट न हो
+    # YouTube के लिंक्स को फ़िल्टर करना
     if "youtube.com" in url or "youtu.be" in url:
-        await event.respond("❌ YouTube के सर्वर ब्लॉकिंग के कारण YouTube वीडियो समर्थित नहीं हैं। कृपया Facebook, Instagram या Twitter लिंक आज़माएं।")
+        await event.respond("⚠️ YouTube के सर्वर ब्लॉकिंग के कारण YouTube सपोर्टेड नहीं है। कृपया Instagram, Facebook, X (Twitter) आदि का लिंक भेजें।")
         return
 
     status_msg = await event.respond("⏳ वीडियो डाउनलोड हो रहा है, कृपया इंतज़ार करें...")
     output_file = f"video_{event.message.id}.mp4"
 
+    # All-other platforms yt-dlp config
     ydl_opts = {
         'format': 'best[filesize<2000M]/best',
         'outtmpl': output_file,
@@ -68,7 +69,7 @@ async def download_video(event):
             )
             await status_msg.delete()
         else:
-            await status_msg.edit("❌ यह वीडियो डाउनलोड नहीं हो सका।")
+            await status_msg.edit("❌ यह वीडियो डाउनलोड नहीं हो सका। कृपया लिंक दोबारा जांचें।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
@@ -77,5 +78,5 @@ async def download_video(event):
         if os.path.exists(output_file):
             os.remove(output_file)
 
-print("Telegram Bot Active...")
+print("Telegram Multi-Platform Downloader Bot Active...")
 bot.run_until_disconnected()
