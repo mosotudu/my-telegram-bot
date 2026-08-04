@@ -3,11 +3,10 @@ import asyncio
 from pyrogram import Client, filters
 import yt_dlp
 
-# आपकी Telegram API डिटेल्स
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 
-# ⚠️ यहाँ अपना BotFather वाला टोकन डालें
+# ⚠️ यहाँ अपना Bot Token ज़रूर डालें
 BOT_TOKEN = "8833066297:AAGcPCEdxfjwGVpfpC09kemN3pltTtFcfxM"
 
 app = Client(
@@ -19,7 +18,7 @@ app = Client(
 
 @app.on_message(filters.command("start"))
 async def start_cmd(client, message):
-    await message.reply_text("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी आसानी से डाउनलोड करके भेज दूंगा!")
+    await message.reply_text("नमस्ते! 👋\nमुझे वीडियो लिंक भेजें, मैं बड़ी फाइलें (2GB तक) भी डाउनलोड करके भेज दूंगा!")
 
 @app.on_message(filters.text & ~filters.command(["start"]))
 async def download_video(client, message):
@@ -62,5 +61,5 @@ async def download_video(client, message):
             os.remove(output_file)
 
 if __name__ == "__main__":
-    print("2GB सपोर्ट वाला बोट चालू हो गया है...")
+    print("2GB सपोर्ट बोट चालू हो गया है...")
     app.run()
