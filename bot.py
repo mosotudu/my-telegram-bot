@@ -5,7 +5,7 @@ from threading import Thread
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from telethon import TelegramClient, events
 
-# --- Dummy Web Server (Render Keeping Alive) ---
+# --- Render 24/7 Server Active Keeper ---
 class HealthCheckHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -23,7 +23,7 @@ Thread(target=run_dummy_server, daemon=True).start()
 API_ID = 35535500
 API_HASH = "4fcafabe7785625b2f1a3c6bfb09c2a5"
 
-# Render Environment Variable से सुरक्षित रूप से टोकन प्राप्त करना
+# Render Environment Variable से टोकन उठाएगा
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 bot = TelegramClient('bot_session', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
@@ -46,26 +46,37 @@ async def download_video(event):
     output_file = f"video_{event.message.id}.mp4"
 
     try:
-        api_url = f"https://api.cohttps.workers.dev/?url={url}"
-        response = requests.get(api_url, stream=True, timeout=60)
+        # Rapid API call to Cobalt
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+        data = {"url": url, "videoQuality": "max"}
+        
+        response = requests.post("https://api.cobalt.tools/api/json", json=data, headers=headers, timeout=20)
         
         if response.status_code == 200:
-            with open(output_file, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=1024*1024):
-                    if chunk:
-                        f.write(chunk)
+            res_data = response.json()
+            if "url" in res_data:
+                video_url = res_data["url"]
+                video_bytes = requests.get(video_url, stream=True, timeout=60)
+                
+                with open(output_file, 'wb') as f:
+                    for chunk in video_bytes.iter_content(chunk_size=1024*1024):
+                        if chunk:
+                            f.write(chunk)
 
-            if os.path.exists(output_file) and os.path.getsize(output_file) > 10000:
-                await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
-                await bot.send_file(
-                    event.chat_id,
-                    file=output_file,
-                    caption="यह रहा आपका वीडियो! 🎬"
-                )
-                await status_msg.delete()
-                return
+                if os.path.exists(output_file) and os.path.getsize(output_file) > 1000:
+                    await status_msg.edit("📤 Telegram पर अपलोड हो रहा है...")
+                    await bot.send_file(
+                        event.chat_id,
+                        file=output_file,
+                        caption="यह रहा आपका वीडियो! 🎬"
+                    )
+                    await status_msg.delete()
+                    return
 
-        await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो पाया।")
+        await status_msg.edit("❌ वीडियो डाउनलोड नहीं हो पाया। कृपया दूसरा लिंक ट्राई करें।")
 
     except Exception as e:
         await status_msg.edit(f"❌ एरर आ गया:\n{str(e)[:150]}")
